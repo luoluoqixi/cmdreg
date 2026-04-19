@@ -5,6 +5,7 @@ use serde::Serialize;
 pub type CommandResult = Result<CommandResponse>;
 
 /// The response from a command handler.
+#[derive(Debug)]
 pub enum CommandResponse {
     /// A JSON-serialized string response.
     Json(String),

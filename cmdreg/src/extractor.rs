@@ -3,11 +3,13 @@ use anyhow::{anyhow, Result};
 use crate::context::CommandContext;
 
 /// A wrapper for JSON-deserialized command arguments (axum-style extractor).
+#[derive(Debug)]
 pub struct Json<T>(pub T)
 where
     T: for<'de> serde::Deserialize<'de>;
 
 /// Marker type for handlers that take no arguments.
+#[derive(Debug)]
 pub struct NoArgsBody;
 
 /// Trait for extracting typed arguments from a [`CommandContext`].
