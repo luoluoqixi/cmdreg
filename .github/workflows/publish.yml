@@ -22,7 +22,7 @@ jobs:
 
       # Publish cmdreg-macros first (dependency of cmdreg)
       - name: Publish cmdreg-macros
-        run: cargo publish -p cmdreg-macros
+        run: cargo publish -p cmdreg-macros || echo "cmdreg-macros already published, skipping"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
