@@ -73,6 +73,24 @@ cargo test --workspace
 cargo test --workspace --all-features
 ```
 
+### CI / CD
+
+- **CI** (`.github/workflows/ci.yml`): Runs `check`, `build`, and `test` on every push/PR to `main` using nightly toolchain.
+- **Publish** (`.github/workflows/publish.yml`): Triggered by pushing a `v*` tag. Publishes `cmdreg-macros` first, then `cmdreg` to crates.io.
+
+#### Release Steps
+
+1. Update `version` in the root `Cargo.toml` (both sub-crates inherit it via `workspace.package.version`).
+2. Commit and push to `main`.
+3. Tag and push:
+   ```bash
+   git tag v0.x.x
+   git push origin v0.x.x
+   ```
+4. GitHub Actions will automatically build and publish both crates to crates.io.
+
+> **Prerequisite**: The GitHub repository must have a secret named `CARGO_REGISTRY_TOKEN` containing a crates.io API token with publish permissions.
+
 ## Architecture & Design Patterns
 
 ### Three Dispatch Modes
