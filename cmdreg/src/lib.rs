@@ -1,5 +1,4 @@
 #![feature(closure_lifetime_binder)]
-#![doc = include_str!("../../README.md")]
 
 mod command_map;
 mod context;
