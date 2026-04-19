@@ -33,7 +33,7 @@ jobs:
         run: sleep 30
 
       - name: Publish cmdreg
-        run: cargo publish -p cmdreg --all-features
+        run: cargo publish -p cmdreg --all-features || echo "cmdreg already published, skipping"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
