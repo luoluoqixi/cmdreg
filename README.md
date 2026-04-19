@@ -1,5 +1,10 @@
 # cmdreg
 
+[![Crates.io](https://img.shields.io/crates/v/cmdreg.svg)](https://crates.io/crates/cmdreg)
+[![docs.rs](https://docs.rs/cmdreg/badge.svg)](https://docs.rs/cmdreg)
+[![CI](https://github.com/luoluoqixi/cmdreg/actions/workflows/ci.yml/badge.svg)](https://github.com/luoluoqixi/cmdreg/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/crates/l/cmdreg.svg)](LICENSE)
+
 English | [中文](README_zh.md)
 
 A lightweight, string-keyed command dispatcher for Rust with **axum-style extractors** and optional **auto-registration macros**.
