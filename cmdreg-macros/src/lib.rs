@@ -5,7 +5,10 @@ use syn::{parse_macro_input, ItemFn, LitStr};
 /// Mark a function as a command handler and auto-register it.
 ///
 /// Automatically selects `reg_command` or `reg_command_async` based on whether
-/// the function is `async`. The command name is generated as `"{prefix}.{fn_name}"`.
+/// the function is `async`.
+///
+/// - With a prefix: `#[command("prefix")]` → command name is `"{prefix}.{fn_name}"`.
+/// - Without a prefix: `#[command]` → command name is `"{fn_name}"`.
 ///
 /// # Examples
 ///
@@ -23,20 +26,29 @@ use syn::{parse_macro_input, ItemFn, LitStr};
 ///     CommandResponse::json(true)
 /// }
 /// // Registers as "fs.exists"
+///
+/// #[command]
+/// fn ping() -> CommandResult {
+///     CommandResponse::json("pong")
+/// }
+/// // Registers as "ping"
 /// ```
 #[proc_macro_attribute]
 pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let prefix = parse_macro_input!(attr as LitStr);
+    let prefix: Option<LitStr> = if attr.is_empty() {
+        None
+    } else {
+        Some(parse_macro_input!(attr as LitStr))
+    };
     let input = parse_macro_input!(item as ItemFn);
 
     let fn_name = &input.sig.ident;
     let fn_name_str = fn_name.to_string();
     let is_async = input.sig.asyncness.is_some();
 
-    let command_name = if prefix.value().is_empty() {
-        fn_name_str.clone()
-    } else {
-        format!("{}.{}", prefix.value(), fn_name_str)
+    let command_name = match &prefix {
+        Some(p) if !p.value().is_empty() => format!("{}.{}", p.value(), fn_name_str),
+        _ => fn_name_str.clone(),
     };
 
     let reg_fn_name = format_ident!("__cmdreg_auto_reg_{}", fn_name_str);

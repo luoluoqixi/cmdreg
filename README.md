@@ -69,19 +69,25 @@ async fn read_file(Json(path): Json<String>) -> CommandResult {
     CommandResponse::json(content)
 }
 
+// Without a prefix — registers as "ping"
+#[command]
+fn ping() -> CommandResult {
+    CommandResponse::json("pong")
+}
+
 // At startup:
 fn main() {
     cmdreg::reg_all_commands().unwrap();
-    // "fs.exists" and "fs.read_file" are now registered
+    // "fs.exists", "fs.read_file", and "ping" are now registered
 }
 ```
 
 ## Feature Flags
 
-| Feature    | Default | Description                                          |
-|------------|---------|------------------------------------------------------|
-| `macros`   | off     | Enables `#[command]` macro and `reg_all_commands()`  |
-| `full`     | off     | Enables all optional features                        |
+| Feature  | Default | Description                                         |
+| -------- | ------- | --------------------------------------------------- |
+| `macros` | off     | Enables `#[command]` macro and `reg_all_commands()` |
+| `full`   | off     | Enables all optional features                       |
 
 ## How It Works
 
@@ -89,7 +95,7 @@ fn main() {
 2. **Global registries** — `LazyLock<Arc<RwLock<...>>>` singletons for sync, async, and callback commands.
 3. **Handler traits** — `CommandHandler<T>` (sync) and `CommandHandlerAsync<T>` (async) are auto-implemented for functions with up to 10 extractor parameters.
 4. **Extractors** — `Json<T>` deserializes `CommandContext` into your typed arguments, similar to axum's extractor pattern.
-5. **`#[command("prefix")]`** — a proc-macro that generates a registration function and submits it to `inventory` for collection at link time.
+5. **`#[command("prefix")]` / `#[command]`** — a proc-macro that generates a registration function and submits it to `inventory` for collection at link time. When no prefix is given, the function name is used directly as the command key.
 
 ## Requirements
 

@@ -69,19 +69,25 @@ async fn read_file(Json(path): Json<String>) -> CommandResult {
     CommandResponse::json(content)
 }
 
+// 不传前缀 — 注册为 "ping"
+#[command]
+fn ping() -> CommandResult {
+    CommandResponse::json("pong")
+}
+
 // 启动时调用：
 fn main() {
     cmdreg::reg_all_commands().unwrap();
-    // "fs.exists" 和 "fs.read_file" 已自动注册
+    // "fs.exists"、"fs.read_file" 和 "ping" 已自动注册
 }
 ```
 
 ## Feature Flags
 
-| Feature    | 默认 | 说明                                        |
-|------------|------|---------------------------------------------|
-| `macros`   | 关闭 | 启用 `#[command]` 宏和 `reg_all_commands()` |
-| `full`     | 关闭 | 启用所有可选 feature                        |
+| Feature  | 默认 | 说明                                        |
+| -------- | ---- | ------------------------------------------- |
+| `macros` | 关闭 | 启用 `#[command]` 宏和 `reg_all_commands()` |
+| `full`   | 关闭 | 启用所有可选 feature                        |
 
 ## 工作原理
 
@@ -89,7 +95,7 @@ fn main() {
 2. **全局注册表** — 使用 `LazyLock<Arc<RwLock<...>>>` 单例分别管理同步、异步和回调命令。
 3. **Handler trait** — `CommandHandler<T>`（同步）和 `CommandHandlerAsync<T>`（异步）为最多 10 个提取器参数的函数自动实现。
 4. **提取器** — `Json<T>` 从 `CommandContext` 中反序列化出类型化参数，类似 axum 的提取器模式。
-5. **`#[command("prefix")]`** — proc-macro 生成注册函数，并通过 `inventory` 在链接期自动收集。
+5. **`#[command("prefix")]` / `#[command]`** — proc-macro 生成注册函数，并通过 `inventory` 在链接期自动收集。不传前缀时，直接使用函数名作为命令键。
 
 ## 环境要求
 

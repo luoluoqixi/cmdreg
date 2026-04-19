@@ -95,10 +95,11 @@ cargo test --workspace --all-features
 
 ### Macro Registration Flow
 
-1. `#[command("prefix")]` generates a registration function `__cmdreg_auto_reg_{fn_name}()`.
+1. `#[command("prefix")]` or `#[command]` generates a registration function `__cmdreg_auto_reg_{fn_name}()`.
 2. `inventory::submit!` registers it as a `CommandRegistration`.
 3. `reg_all_commands()` iterates all collected registrations at startup.
-4. Command names follow the pattern `"{prefix}.{function_name}"`.
+4. With a prefix: command name is `"{prefix}.{function_name}"` (e.g., `"fs.read"`).
+5. Without a prefix: command name is `"{function_name}"` (e.g., `"ping"`).
 
 ## Coding Conventions
 
@@ -117,4 +118,4 @@ cargo test --workspace --all-features
 - **No test suite is present** in the repository. When adding new features, consider adding tests.
 - **The `cmdreg-macros` crate** is a proc-macro crate and cannot export non-macro items. It depends on `syn 2`, `quote`, and `proc-macro2`.
 - **`lib.rs` is the public API surface.** All user-facing types and functions are re-exported from `lib.rs`. When adding new public items, ensure they are re-exported there.
-- **Command key format**: `"{namespace}.{command_name}"` (e.g., `"fs.read"`, `"workspace.open"`).
+- **Command key format**: `"{namespace}.{command_name}"` (e.g., `"fs.read"`) when using `#[command("prefix")]`, or just `"{command_name}"` (e.g., `"ping"`) when using `#[command]` without a prefix.
