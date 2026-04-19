@@ -44,14 +44,15 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let fn_name = &input.sig.ident;
     let fn_name_str = fn_name.to_string();
+    let fn_name_raw = fn_name_str.strip_prefix("r#").unwrap_or(&fn_name_str);
     let is_async = input.sig.asyncness.is_some();
 
     let command_name = match &prefix {
-        Some(p) if !p.value().is_empty() => format!("{}.{}", p.value(), fn_name_str),
-        _ => fn_name_str.clone(),
+        Some(p) if !p.value().is_empty() => format!("{}.{}", p.value(), fn_name_raw),
+        _ => fn_name_raw.to_string(),
     };
 
-    let reg_fn_name = format_ident!("__cmdreg_auto_reg_{}", fn_name_str);
+    let reg_fn_name = format_ident!("__cmdreg_auto_reg_{}", fn_name_raw);
 
     let reg_call = if is_async {
         quote! { cmdreg::reg_command_async(#command_name, #fn_name) }
