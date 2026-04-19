@@ -1,0 +1,19 @@
+[workspace]
+members = ["cmdreg", "cmdreg-macros"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+authors = ["luoluoqixi"]
+repository = "https://github.com/luoluoqixi/cmdreg"
+license = "MIT"
+description = "A lightweight string-keyed command dispatcher with axum-style extractors for Rust"
+
+[workspace.dependencies]
+serde = "1.0"
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+anyhow = "1.0"
+inventory = "0.3"

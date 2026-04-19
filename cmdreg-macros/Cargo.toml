@@ -1,0 +1,16 @@
+[package]
+name = "cmdreg-macros"
+description = "Proc-macros for cmdreg — #[command] attribute for auto-registration"
+version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+edition = { workspace = true }
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"
