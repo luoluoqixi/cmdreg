@@ -1,5 +1,7 @@
 # cmdreg
 
+English | [中文](README_zh.md)
+
 A lightweight, string-keyed command dispatcher for Rust with **axum-style extractors** and optional **auto-registration macros**.
 
 Designed for applications that dispatch operations by name — such as IPC bridges, plugin systems, FFI layers, or embedded scripting hosts.
