@@ -2,6 +2,54 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, FnArg, ItemFn, LitStr, Pat, PatType, ReturnType, Type, TypePath};
 
+/// Parsed `#[command(...)]` attribute arguments.
+struct CommandAttr {
+    prefix: Option<LitStr>,
+    rename_all: Option<LitStr>,
+}
+
+impl syn::parse::Parse for CommandAttr {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut prefix = None;
+        let mut rename_all = None;
+
+        if input.is_empty() {
+            return Ok(Self { prefix, rename_all });
+        }
+
+        // Try to parse a string literal first (the prefix)
+        if input.peek(LitStr) {
+            prefix = Some(input.parse()?);
+            if input.is_empty() {
+                return Ok(Self { prefix, rename_all });
+            }
+            input.parse::<syn::Token![,]>()?;
+        }
+
+        // Parse key = value pairs
+        while !input.is_empty() {
+            let key: syn::Ident = input.parse()?;
+            input.parse::<syn::Token![=]>()?;
+            let value: LitStr = input.parse()?;
+
+            if key == "rename_all" {
+                rename_all = Some(value);
+            } else {
+                return Err(syn::Error::new_spanned(
+                    key,
+                    "unknown attribute, expected `rename_all`",
+                ));
+            }
+
+            if !input.is_empty() {
+                input.parse::<syn::Token![,]>()?;
+            }
+        }
+
+        Ok(Self { prefix, rename_all })
+    }
+}
+
 /// Check if the return type is `CommandResult`.
 fn is_command_result(ret: &ReturnType) -> bool {
     if let ReturnType::Type(_, ty) = ret {
@@ -73,6 +121,21 @@ fn contains_reference(ty: &Type) -> bool {
 /// - With a prefix: `#[command("prefix")]` → command name is `"{prefix}.{fn_name}"`.
 /// - Without a prefix: `#[command]` → command name is `"{fn_name}"`.
 ///
+/// # Options
+///
+/// - `rename_all = "camelCase"` — apply serde rename to the auto-generated args
+///   struct. Accepts any value supported by serde (e.g. `"camelCase"`,
+///   `"snake_case"`, `"PascalCase"`, `"SCREAMING_SNAKE_CASE"`, `"kebab-case"`).
+///   When omitted, no rename is applied (field names match Rust parameter names).
+///
+/// ```rust,ignore
+/// #[command("fs", rename_all = "camelCase")]
+/// fn get_file_list(file_path: String, is_recursive: bool) -> Vec<String> {
+///     vec![]
+/// }
+/// // JSON: {"filePath": "...", "isRecursive": true}
+/// ```
+///
 /// # Two styles
 ///
 /// ## Classic style (extractor-based)
@@ -80,8 +143,6 @@ fn contains_reference(ty: &Type) -> bool {
 /// Use `Json<T>` extractors with any return type:
 ///
 /// ```rust,ignore
-/// use cmdreg::{command, Json, CommandResult, CommandResponse};
-///
 /// #[command("fs")]
 /// fn exists(Json(args): Json<ExistsArgs>) -> bool {
 ///     true
@@ -90,12 +151,9 @@ fn contains_reference(ty: &Type) -> bool {
 ///
 /// ## Plain style (auto-generated)
 ///
-/// Use plain parameters with any return type. The macro auto-generates a
-/// `#[derive(Deserialize)]` struct and a wrapper function:
+/// Use plain parameters with any return type:
 ///
 /// ```rust,ignore
-/// use cmdreg::command;
-///
 /// #[command("fs")]
 /// fn get_file_list(path: String, recursive: bool) -> Vec<String> {
 ///     vec![]
@@ -110,11 +168,7 @@ fn contains_reference(ty: &Type) -> bool {
 /// - `()` / no return → `Ok(CommandResponse::None)`
 #[proc_macro_attribute]
 pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let prefix: Option<LitStr> = if attr.is_empty() {
-        None
-    } else {
-        Some(parse_macro_input!(attr as LitStr))
-    };
+    let attr = parse_macro_input!(attr as CommandAttr);
     let input = parse_macro_input!(item as ItemFn);
 
     let fn_name = &input.sig.ident;
@@ -122,7 +176,7 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name_raw = fn_name_str.strip_prefix("r#").unwrap_or(&fn_name_str);
     let is_async = input.sig.asyncness.is_some();
 
-    let command_name = match &prefix {
+    let command_name = match &attr.prefix {
         Some(p) if !p.value().is_empty() => format!("{}.{}", p.value(), fn_name_raw),
         _ => fn_name_raw.to_string(),
     };
@@ -290,10 +344,17 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
     let param_types: Vec<&Type> = params.iter().map(|pt| pt.ty.as_ref()).collect();
 
     // Args struct (when there are params)
+    let serde_attrs = if let Some(ref rename_all) = attr.rename_all {
+        let rename_str = rename_all.value();
+        quote! { #[serde(crate = "cmdreg::__serde", rename_all = #rename_str)] }
+    } else {
+        quote! { #[serde(crate = "cmdreg::__serde")] }
+    };
+
     let struct_def = if has_params {
         quote! {
             #[derive(cmdreg::__serde::Deserialize)]
-            #[serde(crate = "cmdreg::__serde", rename_all = "camelCase")]
+            #serde_attrs
             #[doc(hidden)]
             #[allow(non_camel_case_types)]
             struct #struct_name {

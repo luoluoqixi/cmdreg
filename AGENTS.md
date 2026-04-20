@@ -121,24 +121,37 @@ cargo test --workspace --all-features
 
 ### Two `#[command]` Styles
 
+Both styles support flexible return types:
+
+- `T: Serialize` → `CommandResponse::json(value)`
+- `Result<T: Serialize>` → `CommandResponse::json(value?)`
+- `CommandResult` → passed through directly
+- `()` / no return → `Ok(CommandResponse::None)`
+
 #### Classic style (extractor-based)
 
-- Handler uses `Json<T>` extractor patterns (e.g., `Json(args): Json<MyArgs>`) and returns `CommandResult`.
-- The macro registers the original function directly — no code generation beyond the registration glue.
+- Handler uses `Json<T>` extractor patterns (e.g., `Json(args): Json<MyArgs>`) and any return type.
+- When the return type is `CommandResult`, the macro registers the original function directly.
+- When the return type is not `CommandResult`, the macro generates a forwarding wrapper that auto-wraps the return value.
 
 #### Plain style (auto-generated)
 
-- Handler uses plain parameters (e.g., `path: String, recursive: bool`) and any `Serialize` return type.
+- Handler uses plain parameters (e.g., `path: String, recursive: bool`) and any return type.
 - The macro auto-generates:
-  - A hidden `#[derive(Deserialize)]` struct with `#[serde(rename_all = "camelCase")]` containing all parameters.
+  - A hidden `#[derive(Deserialize)]` struct containing all parameters.
   - A hidden wrapper function that accepts `Json<GeneratedStruct>`, destructures fields, calls the original function, and wraps the return value.
-- Return type mapping:
-  - `T: Serialize` → `CommandResponse::json(value)`
-  - `Result<T: Serialize>` → `CommandResponse::json(value?)`
-  - `CommandResult` → passed through directly
-  - `()` / no return → `Ok(CommandResponse::None)`
 - Reference types (e.g., `&str`) in parameters are rejected at compile time with a clear error message.
+- Raw identifiers (e.g., `r#type`, `r#move`, `r#override`) are supported — serde strips the `r#` prefix, so JSON keys are `"type"`, `"move"`, `"override"`.
 - Style detection: if all parameters are simple `name: Type` patterns (not destructor patterns like `Json(x): Json<T>`), the plain style is used.
+
+### `#[command]` Options
+
+- **Prefix**: `#[command("prefix")]` → command name is `"{prefix}.{fn_name}"`.
+- **`rename_all`**: Controls serde field renaming on the auto-generated args struct.
+  - Default (omitted): no rename — field names match Rust parameter names.
+  - `#[command("fs", rename_all = "camelCase")]` → `file_path` becomes `"filePath"` in JSON.
+  - Accepts all serde-supported values: `"camelCase"`, `"snake_case"`, `"PascalCase"`, `"SCREAMING_SNAKE_CASE"`, `"kebab-case"`, etc.
+  - Can be used without a prefix: `#[command(rename_all = "camelCase")]`.
 
 ## Coding Conventions
 
@@ -154,7 +167,7 @@ cargo test --workspace --all-features
 - **Nightly Rust is required.** The project uses `#![feature(closure_lifetime_binder)]` in `dispatch_async.rs` and `handler_async.rs`.
 - **`tokio` runtime dependency**: Async and callback dispatch modules use `tokio::sync::RwLock`. Some sync registration functions internally create a new `tokio::runtime::Runtime` to block on async operations.
 - **Max 10 handler parameters**: The macro-generated trait impls support functions with up to 10 extractor parameters.
-- **No test suite is present** in the repository. When adding new features, consider adding tests.
+- **Test suite**: `cmdreg/tests/integration_test.rs` (25 tests) and `cmdreg/tests/macro_test.rs` (25 tests, requires `macros` feature). Run with `cargo test --workspace --all-features`.
 - **The `cmdreg-macros` crate** is a proc-macro crate and cannot export non-macro items. It depends on `syn 2`, `quote`, and `proc-macro2`.
 - **`lib.rs` is the public API surface.** All user-facing types and functions are re-exported from `lib.rs`. When adding new public items, ensure they are re-exported there.
 - **Command key format**: `"{namespace}.{command_name}"` (e.g., `"fs.read"`) when using `#[command("prefix")]`, or just `"{command_name}"` (e.g., `"ping"`) when using `#[command]` without a prefix.

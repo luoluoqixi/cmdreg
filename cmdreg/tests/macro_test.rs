@@ -169,6 +169,34 @@ fn classic_result(Json(pair): Json<Pair>) -> anyhow::Result<String> {
 fn classic_unit(Json(_n): Json<i32>) {}
 
 // ============================================================
+// Raw identifiers (r#type, r#move) as plain params
+// ============================================================
+
+#[command("test.macro")]
+fn with_raw_idents(r#type: String, r#move: bool) -> String {
+    format!("type={}, move={}", r#type, r#move)
+}
+
+#[command("test.macro")]
+async fn async_with_raw_idents(r#type: String, r#override: bool) -> String {
+    format!("type={}, override={}", r#type, r#override)
+}
+
+// ============================================================
+// rename_all option
+// ============================================================
+
+#[command("test.macro", rename_all = "camelCase")]
+fn with_camel_case(file_path: String, is_recursive: bool) -> String {
+    format!("path={}, recursive={}", file_path, is_recursive)
+}
+
+#[command(rename_all = "SCREAMING_SNAKE_CASE")]
+fn with_screaming_snake(my_value: i32) -> i32 {
+    my_value * 2
+}
+
+// ============================================================
 // Tests
 // ============================================================
 
@@ -408,4 +436,77 @@ fn test_classic_unit_return() {
     let result =
         invoke_command("test.classic.classic_unit", CommandContext::String(&args)).unwrap();
     assert!(result.is_none());
+}
+
+// ============================================================
+// Tests for raw identifiers (r#type, r#move)
+// ============================================================
+
+#[test]
+fn test_macro_raw_idents_sync() {
+    reg_all_commands().unwrap();
+
+    // r#type → "type", r#move → "move" in JSON (no rename_all, serde strips r#)
+    let args = serde_json::json!({"type": "file", "move": true});
+    let result =
+        invoke_command("test.macro.with_raw_idents", CommandContext::Value(&args)).unwrap();
+    assert_eq!(result.into_option().unwrap(), r#""type=file, move=true""#);
+}
+
+#[tokio::test]
+async fn test_macro_raw_idents_async() {
+    tokio::task::spawn_blocking(|| reg_all_commands().unwrap())
+        .await
+        .unwrap();
+
+    let args = serde_json::json!({"type": "dir", "override": false});
+    let result = invoke_command_async(
+        "test.macro.async_with_raw_idents",
+        CommandContext::Value(&args),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        result.into_option().unwrap(),
+        r#""type=dir, override=false""#
+    );
+}
+
+// ============================================================
+// Tests for rename_all option
+// ============================================================
+
+#[test]
+fn test_macro_rename_all_camel_case() {
+    reg_all_commands().unwrap();
+
+    // With rename_all = "camelCase": file_path → "filePath", is_recursive → "isRecursive"
+    let args = serde_json::json!({"filePath": "/tmp", "isRecursive": true});
+    let result =
+        invoke_command("test.macro.with_camel_case", CommandContext::Value(&args)).unwrap();
+    assert_eq!(
+        result.into_option().unwrap(),
+        r#""path=/tmp, recursive=true""#
+    );
+}
+
+#[test]
+fn test_macro_rename_all_screaming_snake() {
+    reg_all_commands().unwrap();
+
+    // With rename_all = "SCREAMING_SNAKE_CASE": my_value → "MY_VALUE"
+    let args = serde_json::json!({"MY_VALUE": 21});
+    let result = invoke_command("with_screaming_snake", CommandContext::Value(&args)).unwrap();
+    assert_eq!(result.into_option().unwrap(), "42");
+}
+
+#[test]
+fn test_macro_no_rename_default() {
+    reg_all_commands().unwrap();
+
+    // Without rename_all: field names match Rust parameter names (snake_case)
+    // add(a, b) uses plain names "a" and "b"
+    let args = serde_json::json!({"a": 10, "b": 20});
+    let result = invoke_command("test.macro.add", CommandContext::Value(&args)).unwrap();
+    assert_eq!(result.into_option().unwrap(), "30");
 }
