@@ -154,12 +154,55 @@ fn get_total_count(my_value: i32) -> i32 {
 }
 ```
 
+### Command Metadata Export
+
+Enable the `metadata` feature to export registered command metadata as JSON — useful for codegen, documentation, or client SDK generation:
+
+```toml
+[dependencies]
+cmdreg = { version = "0.2", features = ["metadata"] }
+```
+
+```rust
+use cmdreg::{reg_all_commands, export_commands_json, get_all_command_metas};
+
+fn main() {
+    reg_all_commands().unwrap();
+
+    // Export to a JSON file
+    export_commands_json("commands.json").unwrap();
+
+    // Or access metadata programmatically
+    for meta in get_all_command_metas() {
+        println!("{} ({})", meta.name, meta.style);
+    }
+}
+```
+
+Generated JSON:
+
+```json
+[
+  {
+    "name": "fs.read",
+    "is_async": true,
+    "style": "plain",
+    "params": [
+      { "name": "path", "type": "String" },
+      { "name": "encoding", "type": "String" }
+    ],
+    "return_type": "Result < String >"
+  }
+]
+```
+
 ## Feature Flags
 
-| Feature  | Default | Description                                         |
-| -------- | ------- | --------------------------------------------------- |
-| `macros` | off     | Enables `#[command]` macro and `reg_all_commands()` |
-| `full`   | off     | Enables all optional features                       |
+| Feature    | Default | Description                                           |
+| ---------- | ------- | ----------------------------------------------------- |
+| `macros`   | off     | Enables `#[command]` macro and `reg_all_commands()`   |
+| `metadata` | off     | Enables command metadata export (requires `macros`)   |
+| `full`     | off     | Enables all optional features (`macros` + `metadata`) |
 
 ## How It Works
 

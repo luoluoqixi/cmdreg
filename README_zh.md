@@ -152,12 +152,55 @@ fn get_total_count(my_value: i32) -> i32 {
 }
 ```
 
+### 命令元数据导出
+
+启用 `metadata` feature 可将已注册命令的元数据导出为 JSON —— 适用于代码生成、文档生成或客户端 SDK 生成等场景：
+
+```toml
+[dependencies]
+cmdreg = { version = "0.2", features = ["metadata"] }
+```
+
+```rust
+use cmdreg::{reg_all_commands, export_commands_json, get_all_command_metas};
+
+fn main() {
+    reg_all_commands().unwrap();
+
+    // 导出到 JSON 文件
+    export_commands_json("commands.json").unwrap();
+
+    // 或以编程方式访问元数据
+    for meta in get_all_command_metas() {
+        println!("{} ({})", meta.name, meta.style);
+    }
+}
+```
+
+生成的 JSON：
+
+```json
+[
+  {
+    "name": "fs.read",
+    "is_async": true,
+    "style": "plain",
+    "params": [
+      { "name": "path", "type": "String" },
+      { "name": "encoding", "type": "String" }
+    ],
+    "return_type": "Result < String >"
+  }
+]
+```
+
 ## Feature Flags
 
-| Feature  | 默认 | 说明                                        |
-| -------- | ---- | ------------------------------------------- |
-| `macros` | 关闭 | 启用 `#[command]` 宏和 `reg_all_commands()` |
-| `full`   | 关闭 | 启用所有可选 feature                        |
+| Feature    | 默认 | 说明                                          |
+| ---------- | ---- | --------------------------------------------- |
+| `macros`   | 关闭 | 启用 `#[command]` 宏和 `reg_all_commands()`   |
+| `metadata` | 关闭 | 启用命令元数据导出（依赖 `macros`）           |
+| `full`     | 关闭 | 启用所有可选 feature（`macros` + `metadata`） |
 
 ## 工作原理
 
