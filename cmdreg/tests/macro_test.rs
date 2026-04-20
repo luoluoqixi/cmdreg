@@ -138,6 +138,37 @@ fn safe_divide(a: f64, b: f64) -> anyhow::Result<f64> {
 fn do_nothing() {}
 
 // ============================================================
+// Classic style with non-CommandResult returns (Json extractor + auto-wrap)
+// ============================================================
+
+#[command("test.classic")]
+fn classic_bool(Json(name): Json<String>) -> bool {
+    name == "yes"
+}
+
+#[command("test.classic")]
+async fn async_classic_string(Json(n): Json<i32>) -> String {
+    format!("value: {}", n)
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Pair {
+    left: String,
+    right: String,
+}
+
+#[command("test.classic")]
+fn classic_result(Json(pair): Json<Pair>) -> anyhow::Result<String> {
+    if pair.left.is_empty() {
+        anyhow::bail!("left is empty");
+    }
+    Ok(format!("{}-{}", pair.left, pair.right))
+}
+
+#[command("test.classic")]
+fn classic_unit(Json(_n): Json<i32>) {}
+
+// ============================================================
 // Tests
 // ============================================================
 
@@ -317,4 +348,64 @@ fn test_macro_plain_single_struct_param() {
     let args = serde_json::json!({"p": {"x": 3.0, "y": 4.0}});
     let result = invoke_command("test.macro.point_len", CommandContext::Value(&args)).unwrap();
     assert_eq!(result.into_option().unwrap(), "5.0");
+}
+
+// ============================================================
+// Tests for classic style with non-CommandResult returns
+// ============================================================
+
+#[test]
+fn test_classic_bool_return() {
+    reg_all_commands().unwrap();
+
+    let args = serde_json::to_string("yes").unwrap();
+    let result =
+        invoke_command("test.classic.classic_bool", CommandContext::String(&args)).unwrap();
+    assert_eq!(result.into_option().unwrap(), "true");
+
+    let args = serde_json::to_string("no").unwrap();
+    let result =
+        invoke_command("test.classic.classic_bool", CommandContext::String(&args)).unwrap();
+    assert_eq!(result.into_option().unwrap(), "false");
+}
+
+#[tokio::test]
+async fn test_classic_async_string_return() {
+    tokio::task::spawn_blocking(|| reg_all_commands().unwrap())
+        .await
+        .unwrap();
+
+    let args = serde_json::to_string(&42).unwrap();
+    let result = invoke_command_async(
+        "test.classic.async_classic_string",
+        CommandContext::String(&args),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.into_option().unwrap(), r#""value: 42""#);
+}
+
+#[test]
+fn test_classic_result_return() {
+    reg_all_commands().unwrap();
+
+    let args = serde_json::json!({"left": "a", "right": "b"});
+    let result =
+        invoke_command("test.classic.classic_result", CommandContext::Value(&args)).unwrap();
+    assert_eq!(result.into_option().unwrap(), r#""a-b""#);
+
+    // Error case
+    let args = serde_json::json!({"left": "", "right": "b"});
+    let result = invoke_command("test.classic.classic_result", CommandContext::Value(&args));
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_classic_unit_return() {
+    reg_all_commands().unwrap();
+
+    let args = serde_json::to_string(&42).unwrap();
+    let result =
+        invoke_command("test.classic.classic_unit", CommandContext::String(&args)).unwrap();
+    assert!(result.is_none());
 }

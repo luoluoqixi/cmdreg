@@ -77,22 +77,21 @@ fn contains_reference(ty: &Type) -> bool {
 ///
 /// ## Classic style (extractor-based)
 ///
-/// Use `Json<T>` extractors and return `CommandResult` explicitly:
+/// Use `Json<T>` extractors with any return type:
 ///
 /// ```rust,ignore
 /// use cmdreg::{command, Json, CommandResult, CommandResponse};
 ///
 /// #[command("fs")]
-/// fn exists(Json(args): Json<ExistsArgs>) -> CommandResult {
-///     CommandResponse::json(true)
+/// fn exists(Json(args): Json<ExistsArgs>) -> bool {
+///     true
 /// }
 /// ```
 ///
 /// ## Plain style (auto-generated)
 ///
-/// Use plain parameters and any `Serialize` return type. The macro
-/// auto-generates a `#[derive(Deserialize)]` struct and wraps the return
-/// value with `CommandResponse::json()`:
+/// Use plain parameters with any return type. The macro auto-generates a
+/// `#[derive(Deserialize)]` struct and a wrapper function:
 ///
 /// ```rust,ignore
 /// use cmdreg::command;
@@ -101,10 +100,10 @@ fn contains_reference(ty: &Type) -> bool {
 /// fn get_file_list(path: String, recursive: bool) -> Vec<String> {
 ///     vec![]
 /// }
-/// // Equivalent to defining a camelCase-renamed args struct + Json<T> wrapper
 /// ```
 ///
-/// Supported return types in plain style:
+/// # Return type handling (both styles)
+///
 /// - `T: Serialize` → wrapped with `CommandResponse::json(value)`
 /// - `Result<T: Serialize>` → unwrapped with `?`, then wrapped with json
 /// - `CommandResult` → passed through directly
@@ -148,23 +147,95 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
     let all_plain = params.iter().all(|pt| matches!(*pt.pat, Pat::Ident(_)));
     let is_cmd_result = is_command_result(&input.sig.output);
 
-    // New style if: plain params exist, OR no params but return is not CommandResult
-    let needs_new_style = if has_params {
-        all_plain
-    } else {
-        !is_cmd_result
-    };
+    // Plain style only when all params are plain identifiers (not extractor patterns)
+    let needs_plain_style = has_params && all_plain;
 
-    if !needs_new_style {
-        // ── Classic style: register the original function directly ──
-        let reg_call = if is_async {
-            quote! { cmdreg::reg_command_async(#command_name, #fn_name) }
+    if !needs_plain_style {
+        // ── Classic style (extractor params or no params) ──
+
+        if is_cmd_result {
+            // Already returns CommandResult → register directly
+            let reg_call = if is_async {
+                quote! { cmdreg::reg_command_async(#command_name, #fn_name) }
+            } else {
+                quote! { cmdreg::reg_command(#command_name, #fn_name) }
+            };
+
+            let expanded = quote! {
+                #input
+
+                fn #reg_fn_name() -> ::anyhow::Result<()> {
+                    #reg_call
+                }
+
+                cmdreg::inventory::submit! {
+                    cmdreg::CommandRegistration {
+                        register: #reg_fn_name,
+                    }
+                }
+            };
+            return expanded.into();
+        }
+
+        // Non-CommandResult return → generate forwarding wrapper
+        let wrapper_name = format_ident!("__cmdreg_wrapper_{}", fn_name_raw);
+
+        let wrapper_params: Vec<_> = params
+            .iter()
+            .enumerate()
+            .map(|(i, pt)| {
+                let name = format_ident!("__cmdreg_p{}", i);
+                let ty = &pt.ty;
+                quote! { #name: #ty }
+            })
+            .collect();
+
+        let call_args: Vec<_> = (0..params.len())
+            .map(|i| {
+                let name = format_ident!("__cmdreg_p{}", i);
+                quote! { #name }
+            })
+            .collect();
+
+        let await_suffix = if is_async {
+            quote! { .await }
         } else {
-            quote! { cmdreg::reg_command(#command_name, #fn_name) }
+            quote! {}
+        };
+        let fn_call = quote! { #fn_name(#(#call_args),*) #await_suffix };
+
+        let body = if is_unit_return(&input.sig.output) {
+            quote! { #fn_call; Ok(cmdreg::CommandResponse::None) }
+        } else if is_result_type(&input.sig.output) {
+            quote! { cmdreg::CommandResponse::json(#fn_call?) }
+        } else {
+            quote! { cmdreg::CommandResponse::json(#fn_call) }
+        };
+
+        let async_kw = if is_async {
+            quote! { async }
+        } else {
+            quote! {}
+        };
+
+        let wrapper_fn = quote! {
+            #[doc(hidden)]
+            #[allow(non_snake_case)]
+            #async_kw fn #wrapper_name(#(#wrapper_params),*) -> cmdreg::CommandResult {
+                #body
+            }
+        };
+
+        let reg_call = if is_async {
+            quote! { cmdreg::reg_command_async(#command_name, #wrapper_name) }
+        } else {
+            quote! { cmdreg::reg_command(#command_name, #wrapper_name) }
         };
 
         let expanded = quote! {
             #input
+
+            #wrapper_fn
 
             fn #reg_fn_name() -> ::anyhow::Result<()> {
                 #reg_call
