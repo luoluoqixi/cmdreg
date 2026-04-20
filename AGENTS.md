@@ -119,6 +119,27 @@ cargo test --workspace --all-features
 4. With a prefix: command name is `"{prefix}.{function_name}"` (e.g., `"fs.read"`).
 5. Without a prefix: command name is `"{function_name}"` (e.g., `"ping"`).
 
+### Two `#[command]` Styles
+
+#### Classic style (extractor-based)
+
+- Handler uses `Json<T>` extractor patterns (e.g., `Json(args): Json<MyArgs>`) and returns `CommandResult`.
+- The macro registers the original function directly — no code generation beyond the registration glue.
+
+#### Plain style (auto-generated)
+
+- Handler uses plain parameters (e.g., `path: String, recursive: bool`) and any `Serialize` return type.
+- The macro auto-generates:
+  - A hidden `#[derive(Deserialize)]` struct with `#[serde(rename_all = "camelCase")]` containing all parameters.
+  - A hidden wrapper function that accepts `Json<GeneratedStruct>`, destructures fields, calls the original function, and wraps the return value.
+- Return type mapping:
+  - `T: Serialize` → `CommandResponse::json(value)`
+  - `Result<T: Serialize>` → `CommandResponse::json(value?)`
+  - `CommandResult` → passed through directly
+  - `()` / no return → `Ok(CommandResponse::None)`
+- Reference types (e.g., `&str`) in parameters are rejected at compile time with a clear error message.
+- Style detection: if all parameters are simple `name: Type` patterns (not destructor patterns like `Json(x): Json<T>`), the plain style is used.
+
 ## Coding Conventions
 
 - **Error handling**: Use `anyhow::Result<T>` everywhere. Propagate with `?`.

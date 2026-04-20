@@ -59,6 +59,10 @@ Enable the `macros` feature:
 cmdreg = { version = "0.1", features = ["macros"] }
 ```
 
+#### Classic style (extractor-based)
+
+Use `Json<T>` extractors and return `CommandResult` explicitly:
+
 ```rust
 use cmdreg::{command, Json, CommandResult, CommandResponse};
 
@@ -73,17 +77,52 @@ async fn read_file(Json(path): Json<String>) -> CommandResult {
     let content = tokio::fs::read_to_string(&path).await?;
     CommandResponse::json(content)
 }
+```
 
-// Without a prefix — registers as "ping"
-#[command]
-fn ping() -> CommandResult {
-    CommandResponse::json("pong")
+#### Plain style (auto-generated)
+
+Use plain parameters and any `Serialize` return type — the macro auto-generates
+a `#[derive(Deserialize)]` args struct (with `camelCase` field renaming) and wraps
+the return value with `CommandResponse::json()`:
+
+```rust
+use cmdreg::command;
+
+#[command("fs")]
+fn get_file_list(path: String, recursive: bool) -> Vec<String> {
+    // caller passes: {"path": "./src", "recursive": true}
+    vec![]
 }
 
+#[command("math")]
+fn divide(a: f64, b: f64) -> anyhow::Result<f64> {
+    if b == 0.0 { anyhow::bail!("division by zero"); }
+    Ok(a / b)
+}
+
+#[command]
+fn get_version() -> String {
+    "1.0.0".to_string()
+}
+```
+
+Supported return types in plain style:
+
+| Return type            | Behavior                                    |
+| ---------------------- | ------------------------------------------- |
+| `T: Serialize`         | Wrapped with `CommandResponse::json(value)` |
+| `Result<T: Serialize>` | Unwrapped with `?`, then wrapped with json  |
+| `CommandResult`        | Passed through directly                     |
+| `()` / no return       | Returns `Ok(CommandResponse::None)`         |
+
+> **Note:** Plain-style parameters must be owned types (e.g. `String`, not `&str`).
+> Reference types cannot be deserialized from JSON and will produce a compile error.
+
+```rust
 // At startup:
 fn main() {
     cmdreg::reg_all_commands().unwrap();
-    // "fs.exists", "fs.read_file", and "ping" are now registered
+    // "fs.get_file_list", "math.divide", "get_version", etc. are registered
 }
 ```
 
@@ -101,6 +140,7 @@ fn main() {
 3. **Handler traits** — `CommandHandler<T>` (sync) and `CommandHandlerAsync<T>` (async) are auto-implemented for functions with up to 10 extractor parameters.
 4. **Extractors** — `Json<T>` deserializes `CommandContext` into your typed arguments, similar to axum's extractor pattern.
 5. **`#[command("prefix")]` / `#[command]`** — a proc-macro that generates a registration function and submits it to `inventory` for collection at link time. When no prefix is given, the function name is used directly as the command key.
+6. **Plain-style support** — when using plain parameters (e.g. `path: String`) instead of `Json<T>` extractors, the macro auto-generates a `#[derive(Deserialize)]` args struct and wraps the return value as JSON.
 
 ## Requirements
 

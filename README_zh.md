@@ -59,6 +59,10 @@ reg_command_async("app.greet", greet).unwrap();
 cmdreg = { version = "0.1", features = ["macros"] }
 ```
 
+#### 经典风格（提取器）
+
+使用 `Json<T>` 提取器，显式返回 `CommandResult`：
+
 ```rust
 use cmdreg::{command, Json, CommandResult, CommandResponse};
 
@@ -73,17 +77,51 @@ async fn read_file(Json(path): Json<String>) -> CommandResult {
     let content = tokio::fs::read_to_string(&path).await?;
     CommandResponse::json(content)
 }
+```
 
-// 不传前缀 — 注册为 "ping"
-#[command]
-fn ping() -> CommandResult {
-    CommandResponse::json("pong")
+#### 简洁风格（自动生成）
+
+使用普通参数和任意 `Serialize` 返回类型 — 宏会自动生成 `#[derive(Deserialize)]`
+参数结构体（字段名转为 `camelCase`），并用 `CommandResponse::json()` 包裹返回值：
+
+```rust
+use cmdreg::command;
+
+#[command("fs")]
+fn get_file_list(path: String, recursive: bool) -> Vec<String> {
+    // 调用方传参: {"path": "./src", "recursive": true}
+    vec![]
 }
 
+#[command("math")]
+fn divide(a: f64, b: f64) -> anyhow::Result<f64> {
+    if b == 0.0 { anyhow::bail!("division by zero"); }
+    Ok(a / b)
+}
+
+#[command]
+fn get_version() -> String {
+    "1.0.0".to_string()
+}
+```
+
+简洁风格支持的返回类型：
+
+| 返回类型               | 行为                                   |
+| ---------------------- | -------------------------------------- |
+| `T: Serialize`         | 用 `CommandResponse::json(value)` 包裹 |
+| `Result<T: Serialize>` | 先用 `?` 解包，再用 json 包裹          |
+| `CommandResult`        | 直接透传                               |
+| `()` / 无返回值        | 返回 `Ok(CommandResponse::None)`       |
+
+> **注意：** 简洁风格的参数必须是拥有所有权的类型（如 `String`，不能用 `&str`）。
+> 引用类型无法从 JSON 反序列化，会产生编译错误。
+
+```rust
 // 启动时调用：
 fn main() {
     cmdreg::reg_all_commands().unwrap();
-    // "fs.exists"、"fs.read_file" 和 "ping" 已自动注册
+    // "fs.get_file_list"、"math.divide"、"get_version" 等已自动注册
 }
 ```
 
@@ -101,6 +139,7 @@ fn main() {
 3. **Handler trait** — `CommandHandler<T>`（同步）和 `CommandHandlerAsync<T>`（异步）为最多 10 个提取器参数的函数自动实现。
 4. **提取器** — `Json<T>` 从 `CommandContext` 中反序列化出类型化参数，类似 axum 的提取器模式。
 5. **`#[command("prefix")]` / `#[command]`** — proc-macro 生成注册函数，并通过 `inventory` 在链接期自动收集。不传前缀时，直接使用函数名作为命令键。
+6. **简洁风格支持** — 使用普通参数（如 `path: String`）代替 `Json<T>` 提取器时，宏自动生成 `#[derive(Deserialize)]` 参数结构体并将返回值包裹为 JSON。
 
 ## 环境要求
 

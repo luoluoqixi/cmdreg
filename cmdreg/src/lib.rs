@@ -14,6 +14,11 @@ mod callback;
 #[cfg(feature = "macros")]
 mod registry;
 
+// Re-export serde for proc-macro generated code
+#[cfg(feature = "macros")]
+#[doc(hidden)]
+pub extern crate serde as __serde;
+
 // Core types
 pub use command_map::CommandMap;
 pub use context::CommandContext;
