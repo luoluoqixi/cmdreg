@@ -24,7 +24,7 @@ Designed for applications that dispatch operations by name — such as IPC bridg
 
 ```toml
 [dependencies]
-cmdreg = "0.1"
+cmdreg = "0.2"
 anyhow = "1.0"
 ```
 

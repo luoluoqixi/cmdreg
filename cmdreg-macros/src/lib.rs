@@ -16,7 +16,7 @@ fn read_global_rename_all() -> Option<String> {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok()?;
     let cargo_toml_path = std::path::Path::new(&manifest_dir).join("Cargo.toml");
     let content = std::fs::read_to_string(cargo_toml_path).ok()?;
-    let table: toml::Value = content.parse().ok()?;
+    let table: toml::Table = content.parse().ok()?;
     table
         .get("package")?
         .get("metadata")?

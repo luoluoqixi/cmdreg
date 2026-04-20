@@ -24,7 +24,7 @@
 
 ```toml
 [dependencies]
-cmdreg = "0.1"
+cmdreg = "0.2"
 anyhow = "1.0"
 ```
 
