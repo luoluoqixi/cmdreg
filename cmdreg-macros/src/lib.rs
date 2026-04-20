@@ -2,11 +2,41 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, FnArg, ItemFn, LitStr, Pat, PatType, ReturnType, Type, TypePath};
 
+/// Compact a token stream string by removing unnecessary spaces around punctuation.
+fn compact_type_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            ' ' => {
+                // Drop space if previous char is punctuation-like, or peek next
+                // We'll add space and trim later
+                out.push(' ');
+            }
+            _ => out.push(ch),
+        }
+    }
+    // Remove spaces around < > , ( ) [ ] & :
+    let mut result = out;
+    for &punct in &[
+        "< ", " <", "> ", " >", "( ", " (", ") ", " )", "[ ", " [", "] ", " ]", " ,", "& ",
+    ] {
+        let compact = punct.trim();
+        result = result.replace(punct, compact);
+    }
+    // Restore space after comma
+    result = result.replace(',', ", ");
+    // Collapse multiple spaces
+    while result.contains("  ") {
+        result = result.replace("  ", " ");
+    }
+    result.trim().to_string()
+}
+
 /// Get the return type as a string for metadata.
 fn return_type_string(ret: &ReturnType) -> String {
     match ret {
         ReturnType::Default => "()".to_string(),
-        ReturnType::Type(_, ty) => quote!(#ty).to_string(),
+        ReturnType::Type(_, ty) => compact_type_string(&quote!(#ty).to_string()),
     }
 }
 
@@ -248,7 +278,7 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
                     "?".to_string()
                 };
                 let ty = &pt.ty;
-                let type_str = quote!(#ty).to_string();
+                let type_str = compact_type_string(&quote!(#ty).to_string());
                 quote! {
                     cmdreg::CommandParamMeta {
                         name: #name_str,
