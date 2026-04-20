@@ -13,6 +13,10 @@ categories = ["rust-patterns", "asynchronous"]
 [package.metadata.cmdreg]
 rename_all = "camelCase"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
 default = []
 macros = ["dep:cmdreg-macros", "dep:inventory"]
@@ -26,4 +30,4 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 inventory = { workspace = true, optional = true }
-cmdreg-macros = { path = "../cmdreg-macros", version = "0.1", optional = true }
+cmdreg-macros = { path = "../cmdreg-macros", version = "0.2", optional = true }

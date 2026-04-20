@@ -5,7 +5,7 @@
 [![CI](https://github.com/luoluoqixi/cmdreg/actions/workflows/ci.yml/badge.svg)](https://github.com/luoluoqixi/cmdreg/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/crates/l/cmdreg.svg)](LICENSE)
 
-English | [中文](README_zh.md)
+English | [中文](https://github.com/luoluoqixi/cmdreg/blob/main/README_zh.md)
 
 A lightweight, string-keyed command dispatcher for Rust with **axum-style extractors** and optional **auto-registration macros**.
 

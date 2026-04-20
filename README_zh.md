@@ -5,7 +5,7 @@
 [![CI](https://github.com/luoluoqixi/cmdreg/actions/workflows/ci.yml/badge.svg)](https://github.com/luoluoqixi/cmdreg/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/crates/l/cmdreg.svg)](LICENSE)
 
-[English](README.md) | 中文
+[English](https://github.com/luoluoqixi/cmdreg/blob/main/README.md) | 中文
 
 一个轻量级的、基于字符串键的 Rust 命令分发框架，支持 **axum 风格的参数提取器** 和可选的 **自动注册宏**。
 
