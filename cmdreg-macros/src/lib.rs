@@ -2,6 +2,14 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, FnArg, ItemFn, LitStr, Pat, PatType, ReturnType, Type, TypePath};
 
+/// Get the return type as a string for metadata.
+fn return_type_string(ret: &ReturnType) -> String {
+    match ret {
+        ReturnType::Default => "()".to_string(),
+        ReturnType::Type(_, ty) => quote!(#ty).to_string(),
+    }
+}
+
 /// Read the global `rename_all` default from `[package.metadata.cmdreg]` in the
 /// calling crate's `Cargo.toml`.
 fn read_global_rename_all() -> Option<String> {
@@ -220,6 +228,70 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Plain style only when all params are plain identifiers (not extractor patterns)
     let needs_plain_style = has_params && all_plain;
 
+    // ── Build metadata for CommandRegistration ──
+    let return_type_str = return_type_string(&input.sig.output);
+    let style_str = if needs_plain_style {
+        "plain"
+    } else {
+        "classic"
+    };
+
+    // For plain style, we can emit param metadata; for classic style, params = []
+    let meta_params = if needs_plain_style {
+        let param_metas: Vec<_> = params
+            .iter()
+            .map(|pt| {
+                let name_str = if let Pat::Ident(pat_ident) = &*pt.pat {
+                    let s = pat_ident.ident.to_string();
+                    s.strip_prefix("r#").unwrap_or(&s).to_string()
+                } else {
+                    "?".to_string()
+                };
+                let ty = &pt.ty;
+                let type_str = quote!(#ty).to_string();
+                quote! {
+                    cmdreg::CommandParamMeta {
+                        name: #name_str,
+                        r#type: #type_str,
+                    }
+                }
+            })
+            .collect();
+        quote! { &[#(#param_metas),*] }
+    } else {
+        quote! { &[] }
+    };
+
+    let meta_expr = quote! {
+        cmdreg::CommandMeta {
+            name: #command_name,
+            is_async: #is_async,
+            style: #style_str,
+            params: #meta_params,
+            return_type: #return_type_str,
+        }
+    };
+
+    // Helper: generate inventory::submit! with conditional meta field
+    let submit_block = |reg_fn: &syn::Ident| {
+        quote! {
+            #[cfg(feature = "metadata")]
+            cmdreg::inventory::submit! {
+                cmdreg::CommandRegistration {
+                    register: #reg_fn,
+                    meta: #meta_expr,
+                }
+            }
+
+            #[cfg(not(feature = "metadata"))]
+            cmdreg::inventory::submit! {
+                cmdreg::CommandRegistration {
+                    register: #reg_fn,
+                }
+            }
+        }
+    };
+
     if !needs_plain_style {
         // ── Classic style (extractor params or no params) ──
 
@@ -231,6 +303,8 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
                 quote! { cmdreg::reg_command(#command_name, #fn_name) }
             };
 
+            let submit = submit_block(&reg_fn_name);
+
             let expanded = quote! {
                 #input
 
@@ -238,11 +312,7 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
                     #reg_call
                 }
 
-                cmdreg::inventory::submit! {
-                    cmdreg::CommandRegistration {
-                        register: #reg_fn_name,
-                    }
-                }
+                #submit
             };
             return expanded.into();
         }
@@ -302,6 +372,8 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
             quote! { cmdreg::reg_command(#command_name, #wrapper_name) }
         };
 
+        let submit = submit_block(&reg_fn_name);
+
         let expanded = quote! {
             #input
 
@@ -311,11 +383,7 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
                 #reg_call
             }
 
-            cmdreg::inventory::submit! {
-                cmdreg::CommandRegistration {
-                    register: #reg_fn_name,
-                }
-            }
+            #submit
         };
         return expanded.into();
     }
@@ -441,6 +509,8 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { cmdreg::reg_command(#command_name, #wrapper_name) }
     };
 
+    let submit = submit_block(&reg_fn_name);
+
     let expanded = quote! {
         #input
 
@@ -452,11 +522,7 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
             #reg_call
         }
 
-        cmdreg::inventory::submit! {
-            cmdreg::CommandRegistration {
-                register: #reg_fn_name,
-            }
-        }
+        #submit
     };
 
     expanded.into()

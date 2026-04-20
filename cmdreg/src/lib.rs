@@ -50,5 +50,7 @@ pub use callback::{
 pub use cmdreg_macros::command;
 #[cfg(feature = "macros")]
 pub use inventory;
+#[cfg(feature = "metadata")]
+pub use registry::{export_commands_json, get_all_command_metas, CommandMeta, CommandParamMeta};
 #[cfg(feature = "macros")]
 pub use registry::{reg_all_commands, CommandRegistration};

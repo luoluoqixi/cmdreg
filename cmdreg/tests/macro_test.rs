@@ -577,3 +577,68 @@ fn test_macro_explicit_rename_overrides_global() {
     let result = invoke_command("with_screaming_snake", CommandContext::Value(&args)).unwrap();
     assert_eq!(result.into_option().unwrap(), "42");
 }
+
+// ============================================================
+// Tests for command metadata export
+// ============================================================
+
+#[cfg(feature = "metadata")]
+#[test]
+fn test_get_all_command_metas() {
+    reg_all_commands().unwrap();
+
+    let metas = get_all_command_metas();
+    assert!(!metas.is_empty());
+
+    // Find plain-style command with params
+    let add_meta = metas.iter().find(|m| m.name == "test.macro.add").unwrap();
+    assert_eq!(add_meta.style, "plain");
+    assert!(!add_meta.is_async);
+    assert_eq!(add_meta.params.len(), 2);
+    assert_eq!(add_meta.params[0].name, "a");
+    assert_eq!(add_meta.params[1].name, "b");
+
+    // Find async plain-style command
+    let async_mul = metas
+        .iter()
+        .find(|m| m.name == "test.macro.async_multiply")
+        .unwrap();
+    assert_eq!(async_mul.style, "plain");
+    assert!(async_mul.is_async);
+    assert_eq!(async_mul.params.len(), 2);
+
+    // Find classic-style command (no param metadata)
+    let ping_meta = metas.iter().find(|m| m.name == "test.macro.ping").unwrap();
+    assert_eq!(ping_meta.style, "classic");
+    assert!(ping_meta.params.is_empty());
+
+    // Find no-prefix command (no params → classic style)
+    let ver_meta = metas.iter().find(|m| m.name == "get_version").unwrap();
+    assert_eq!(ver_meta.style, "classic");
+    assert!(ver_meta.params.is_empty());
+}
+
+#[cfg(feature = "metadata")]
+#[test]
+fn test_export_commands_json() {
+    reg_all_commands().unwrap();
+
+    let path = std::env::temp_dir().join("cmdreg_test_commands.json");
+    export_commands_json(&path).unwrap();
+
+    let content = std::fs::read_to_string(&path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert!(parsed.is_array());
+
+    let arr = parsed.as_array().unwrap();
+    assert!(!arr.is_empty());
+
+    // Verify structure of an entry
+    let add_entry = arr.iter().find(|v| v["name"] == "test.macro.add").unwrap();
+    assert_eq!(add_entry["style"], "plain");
+    assert_eq!(add_entry["is_async"], false);
+    assert!(add_entry["params"].is_array());
+    assert_eq!(add_entry["params"][0]["name"], "a");
+
+    std::fs::remove_file(&path).ok();
+}
