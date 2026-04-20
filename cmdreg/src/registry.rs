@@ -35,6 +35,37 @@ pub struct CommandRegistration {
 
 inventory::collect!(CommandRegistration);
 
+/// Helper macro used by `#[command]` proc-macro to submit registrations.
+/// The `#[cfg]` is evaluated in cmdreg's context (where `metadata` feature exists),
+/// avoiding `check-cfg` warnings in consuming crates.
+#[cfg(feature = "metadata")]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __submit_registration {
+    ($reg_fn:ident, $meta:expr) => {
+        $crate::inventory::submit! {
+            $crate::CommandRegistration {
+                register: $reg_fn,
+                meta: $meta,
+            }
+        }
+    };
+}
+
+/// Helper macro (no-metadata variant) — ignores the meta expression.
+#[cfg(not(feature = "metadata"))]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __submit_registration {
+    ($reg_fn:ident, $meta:expr) => {
+        $crate::inventory::submit! {
+            $crate::CommandRegistration {
+                register: $reg_fn,
+            }
+        }
+    };
+}
+
 /// Execute all auto-registered command handlers collected by `#[command]` macros.
 pub fn reg_all_commands() -> Result<()> {
     for reg in inventory::iter::<CommandRegistration> {

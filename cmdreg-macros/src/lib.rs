@@ -272,23 +272,11 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    // Helper: generate inventory::submit! with conditional meta field
+    // Helper: generate inventory::submit! via cmdreg's helper macro,
+    // which handles the metadata cfg internally (no cfg in expanded code).
     let submit_block = |reg_fn: &syn::Ident| {
         quote! {
-            #[cfg(feature = "metadata")]
-            cmdreg::inventory::submit! {
-                cmdreg::CommandRegistration {
-                    register: #reg_fn,
-                    meta: #meta_expr,
-                }
-            }
-
-            #[cfg(not(feature = "metadata"))]
-            cmdreg::inventory::submit! {
-                cmdreg::CommandRegistration {
-                    register: #reg_fn,
-                }
-            }
+            cmdreg::__submit_registration!(#reg_fn, #meta_expr);
         }
     };
 
