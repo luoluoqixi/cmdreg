@@ -364,7 +364,7 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
         .rename_all
         .as_ref()
         .map(|lit| lit.value())
-        .or_else(|| read_global_rename_all());
+        .or_else(read_global_rename_all);
 
     let serde_attrs = if let Some(ref rename_str) = effective_rename_all {
         quote! { #[serde(crate = "cmdreg::__serde", rename_all = #rename_str)] }
