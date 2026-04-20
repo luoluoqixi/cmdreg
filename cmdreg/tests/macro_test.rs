@@ -197,6 +197,21 @@ fn with_screaming_snake(my_value: i32) -> i32 {
 }
 
 // ============================================================
+// Global rename_all from [package.metadata.cmdreg] in Cargo.toml
+// No explicit rename_all — should use global "camelCase"
+// ============================================================
+
+#[command("test.global")]
+fn global_rename_test(file_path: String, is_recursive: bool) -> String {
+    format!("path={}, recursive={}", file_path, is_recursive)
+}
+
+#[command("test.global")]
+async fn async_global_rename_test(max_depth: i32, include_hidden: bool) -> String {
+    format!("depth={}, hidden={}", max_depth, include_hidden)
+}
+
+// ============================================================
 // Tests
 // ============================================================
 
@@ -509,4 +524,56 @@ fn test_macro_no_rename_default() {
     let args = serde_json::json!({"a": 10, "b": 20});
     let result = invoke_command("test.macro.add", CommandContext::Value(&args)).unwrap();
     assert_eq!(result.into_option().unwrap(), "30");
+}
+
+// ============================================================
+// Tests for global rename_all from Cargo.toml metadata
+// ============================================================
+
+#[test]
+fn test_macro_global_rename_all() {
+    reg_all_commands().unwrap();
+
+    // No explicit rename_all on #[command] — uses global "camelCase" from
+    // [package.metadata.cmdreg] in Cargo.toml.
+    // file_path → "filePath", is_recursive → "isRecursive"
+    let args = serde_json::json!({"filePath": "/tmp", "isRecursive": true});
+    let result = invoke_command(
+        "test.global.global_rename_test",
+        CommandContext::Value(&args),
+    )
+    .unwrap();
+    assert_eq!(
+        result.into_option().unwrap(),
+        r#""path=/tmp, recursive=true""#
+    );
+}
+
+#[tokio::test]
+async fn test_macro_global_rename_all_async() {
+    tokio::task::spawn_blocking(|| reg_all_commands().unwrap())
+        .await
+        .unwrap();
+
+    // max_depth → "maxDepth", include_hidden → "includeHidden"
+    let args = serde_json::json!({"maxDepth": 5, "includeHidden": false});
+    let result = invoke_command_async(
+        "test.global.async_global_rename_test",
+        CommandContext::Value(&args),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.into_option().unwrap(), r#""depth=5, hidden=false""#);
+}
+
+#[test]
+fn test_macro_explicit_rename_overrides_global() {
+    reg_all_commands().unwrap();
+
+    // with_screaming_snake has explicit rename_all = "SCREAMING_SNAKE_CASE"
+    // which overrides the global "camelCase".
+    // my_value → "MY_VALUE" (not "myValue")
+    let args = serde_json::json!({"MY_VALUE": 21});
+    let result = invoke_command("with_screaming_snake", CommandContext::Value(&args)).unwrap();
+    assert_eq!(result.into_option().unwrap(), "42");
 }

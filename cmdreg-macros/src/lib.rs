@@ -2,6 +2,22 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, FnArg, ItemFn, LitStr, Pat, PatType, ReturnType, Type, TypePath};
 
+/// Read the global `rename_all` default from `[package.metadata.cmdreg]` in the
+/// calling crate's `Cargo.toml`.
+fn read_global_rename_all() -> Option<String> {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok()?;
+    let cargo_toml_path = std::path::Path::new(&manifest_dir).join("Cargo.toml");
+    let content = std::fs::read_to_string(cargo_toml_path).ok()?;
+    let table: toml::Value = content.parse().ok()?;
+    table
+        .get("package")?
+        .get("metadata")?
+        .get("cmdreg")?
+        .get("rename_all")?
+        .as_str()
+        .map(String::from)
+}
+
 /// Parsed `#[command(...)]` attribute arguments.
 struct CommandAttr {
     prefix: Option<LitStr>,
@@ -344,8 +360,13 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
     let param_types: Vec<&Type> = params.iter().map(|pt| pt.ty.as_ref()).collect();
 
     // Args struct (when there are params)
-    let serde_attrs = if let Some(ref rename_all) = attr.rename_all {
-        let rename_str = rename_all.value();
+    let effective_rename_all = attr
+        .rename_all
+        .as_ref()
+        .map(|lit| lit.value())
+        .or_else(|| read_global_rename_all());
+
+    let serde_attrs = if let Some(ref rename_str) = effective_rename_all {
         quote! { #[serde(crate = "cmdreg::__serde", rename_all = #rename_str)] }
     } else {
         quote! { #[serde(crate = "cmdreg::__serde")] }

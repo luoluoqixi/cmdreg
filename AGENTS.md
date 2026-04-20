@@ -148,10 +148,24 @@ Both styles support flexible return types:
 
 - **Prefix**: `#[command("prefix")]` → command name is `"{prefix}.{fn_name}"`.
 - **`rename_all`**: Controls serde field renaming on the auto-generated args struct.
-  - Default (omitted): no rename — field names match Rust parameter names.
+  - Default (omitted): uses the global default from `[package.metadata.cmdreg]` in `Cargo.toml`, or no rename if not configured.
   - `#[command("fs", rename_all = "camelCase")]` → `file_path` becomes `"filePath"` in JSON.
+  - Explicit `rename_all` on `#[command]` always overrides the global default.
   - Accepts all serde-supported values: `"camelCase"`, `"snake_case"`, `"PascalCase"`, `"SCREAMING_SNAKE_CASE"`, `"kebab-case"`, etc.
   - Can be used without a prefix: `#[command(rename_all = "camelCase")]`.
+
+### Global Configuration
+
+Set a default `rename_all` for all `#[command]` macros in a crate via `Cargo.toml`:
+
+```toml
+[package.metadata.cmdreg]
+rename_all = "camelCase"
+```
+
+- The proc-macro reads `CARGO_MANIFEST_DIR/Cargo.toml` at compile time.
+- Per-function `rename_all` in `#[command(...)]` overrides the global default.
+- If neither is set, no rename is applied (field names match Rust parameter names).
 
 ## Coding Conventions
 
@@ -167,7 +181,7 @@ Both styles support flexible return types:
 - **Nightly Rust is required.** The project uses `#![feature(closure_lifetime_binder)]` in `dispatch_async.rs` and `handler_async.rs`.
 - **`tokio` runtime dependency**: Async and callback dispatch modules use `tokio::sync::RwLock`. Some sync registration functions internally create a new `tokio::runtime::Runtime` to block on async operations.
 - **Max 10 handler parameters**: The macro-generated trait impls support functions with up to 10 extractor parameters.
-- **Test suite**: `cmdreg/tests/integration_test.rs` (25 tests) and `cmdreg/tests/macro_test.rs` (25 tests, requires `macros` feature). Run with `cargo test --workspace --all-features`.
+- **Test suite**: `cmdreg/tests/integration_test.rs` (25 tests) and `cmdreg/tests/macro_test.rs` (28 tests, requires `macros` feature). Run with `cargo test --workspace --all-features`.
 - **The `cmdreg-macros` crate** is a proc-macro crate and cannot export non-macro items. It depends on `syn 2`, `quote`, and `proc-macro2`.
 - **`lib.rs` is the public API surface.** All user-facing types and functions are re-exported from `lib.rs`. When adding new public items, ensure they are re-exported there.
 - **Command key format**: `"{namespace}.{command_name}"` (e.g., `"fs.read"`) when using `#[command("prefix")]`, or just `"{command_name}"` (e.g., `"ping"`) when using `#[command]` without a prefix.

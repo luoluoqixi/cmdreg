@@ -82,7 +82,7 @@ async fn read_file(Json(path): Json<String>) -> CommandResult {
 #### 简洁风格（自动生成）
 
 使用普通参数和任意 `Serialize` 返回类型 — 宏会自动生成 `#[derive(Deserialize)]`
-参数结构体（字段名转为 `camelCase`），并用 `CommandResponse::json()` 包裹返回值：
+参数结构体，并用 `CommandResponse::json()` 包裹返回值：
 
 ```rust
 use cmdreg::command;
@@ -122,6 +122,33 @@ fn get_version() -> String {
 fn main() {
     cmdreg::reg_all_commands().unwrap();
     // "fs.get_file_list"、"math.divide"、"get_version" 等已自动注册
+}
+```
+
+### 全局配置
+
+在 `Cargo.toml` 中为所有 `#[command]` 设置默认的 `rename_all`：
+
+```toml
+[package.metadata.cmdreg]
+rename_all = "camelCase"
+```
+
+proc-macro 在编译期读取 `Cargo.toml`。未配置时字段名保持与 Rust 参数名一致。
+
+也可在单个函数上用 `rename_all` 覆盖全局默认：
+
+```rust
+#[command("fs", rename_all = "camelCase")]
+fn get_file_list(file_path: String, is_recursive: bool) -> Vec<String> {
+    // JSON: {"filePath": "...", "isRecursive": true}
+    vec![]
+}
+
+#[command("stats", rename_all = "SCREAMING_SNAKE_CASE")]
+fn get_total_count(my_value: i32) -> i32 {
+    // JSON: {"MY_VALUE": 42}  — 覆盖全局默认
+    my_value
 }
 ```
 

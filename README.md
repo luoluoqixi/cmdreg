@@ -82,8 +82,8 @@ async fn read_file(Json(path): Json<String>) -> CommandResult {
 #### Plain style (auto-generated)
 
 Use plain parameters and any `Serialize` return type — the macro auto-generates
-a `#[derive(Deserialize)]` args struct (with `camelCase` field renaming) and wraps
-the return value with `CommandResponse::json()`:
+a `#[derive(Deserialize)]` args struct and wraps the return value with
+`CommandResponse::json()`:
 
 ```rust
 use cmdreg::command;
@@ -123,6 +123,34 @@ Supported return types in plain style:
 fn main() {
     cmdreg::reg_all_commands().unwrap();
     // "fs.get_file_list", "math.divide", "get_version", etc. are registered
+}
+```
+
+### Global Configuration
+
+Set a default `rename_all` for all `#[command]` macros in your crate's `Cargo.toml`:
+
+```toml
+[package.metadata.cmdreg]
+rename_all = "camelCase"
+```
+
+The proc-macro reads `Cargo.toml` at compile time. Without this config, field names
+match Rust parameter names as-is.
+
+Per-function `rename_all` overrides the global default:
+
+```rust
+#[command("fs", rename_all = "camelCase")]
+fn get_file_list(file_path: String, is_recursive: bool) -> Vec<String> {
+    // JSON: {"filePath": "...", "isRecursive": true}
+    vec![]
+}
+
+#[command("stats", rename_all = "SCREAMING_SNAKE_CASE")]
+fn get_total_count(my_value: i32) -> i32 {
+    // JSON: {"MY_VALUE": 42} — overrides global default
+    my_value
 }
 ```
 

@@ -10,6 +10,9 @@ readme = "../README.md"
 keywords = ["command", "dispatcher", "handler", "registry", "async"]
 categories = ["rust-patterns", "asynchronous"]
 
+[package.metadata.cmdreg]
+rename_all = "camelCase"
+
 [features]
 default = []
 macros = ["dep:cmdreg-macros", "dep:inventory"]
